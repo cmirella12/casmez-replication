@@ -30,5 +30,5 @@ rdplot index_stateint km if year==2013 & abs(km)<100, ///
 	graph describe stateint2013
 
 gr combine stateint9418 stateint2013, rows(2) graphregion(color(white))
-graph export "~/Documents/ECO726/out/Fig4_MWE.pdf", replace
+graph export "$PATH/Fig4_MWE.pdf", replace
 
