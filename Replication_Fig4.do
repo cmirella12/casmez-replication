@@ -2,9 +2,9 @@
 
     clear all
     set more off 
-	
 
-    import delimited using "~/Documents/ECO726/out/casmez_replication.csv", clear 
+	global PATH "~/Documents/ECO726/out"
+    import delimited using "$PATH/casmez_replication.csv", clear 
 	
 * Install RD package 
     cap which rdrobust 
