@@ -1,0 +1,41 @@
+* Extension on Heterogeneity for 2013 only 
+* Replicator: Mirella Charros 
+
+
+	set more off 
+	
+* --- parameters 
+	local bw 47
+	global covs "i.codprov_istat"
+
+* --- Import csv
+	import delimited using "$DATA/casmez_replication.csv", clear
+	cap destring year km casmez index_stateint segm3 codprov_istat codistat, replace force
+
+* --- 2013 election - heterogeneity
+	est clear
+foreach s in 1 2 3 {
+    qui reg index_stateint casmez c.km $covs ///
+        if year==2013 & segm3==`s' & abs(km)<`bw', robust
+    est sto segm3_`s'
+}
+
+	esttab segm3_1 segm3_2 segm3_3, ///
+    keep(casmez) se b(%9.2f) se(%9.2f) ///
+    title("Heterogeneity by Municipality Type (2013)") ///
+    mtitles("segm3=1" "segm3=2" "segm3=3")
+
+* --- Export table to LaTex
+
+	esttab segm3_1 segm3_2 segm3_3 ///
+		using "$OUT/tab/Tab_extension_segm3.tex", ///
+		replace ///
+		keep(casmez) ///
+		se ///
+		b(%9.2f) se(%9.2f) ///
+		star(* 0.10 ** 0.05 *** 0.01) ///
+		mtitles("segm3 = 1" "segm3 = 2" "segm3 = 3") ///
+		title("Heterogeneity by Municipality Type (2013)") ///
+    label
+
+	di as txt "Saved: $TAB/Tab_extension_segm3.tex"

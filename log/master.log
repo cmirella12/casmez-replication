@@ -1,0 +1,422 @@
+---------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  /Users/mirellacharos/Documents/ECO726-casmez-replication/output/log/master.log
+  log type:  text
+ opened on:  16 Dec 2025, 22:05:14
+
+. 
+. * --- Required packages
+.         cap which rdrobust
+
+.         if _rc ssc install rdrobust, replace
+
+. 
+.         cap which texdoc
+
+.         if _rc ssc install texdoc, replace
+
+. 
+.         cap which esttab
+
+.         if _rc ssc install estout, replace
+
+. 
+. * --- Run replication 
+.         do "$DO/01_replication_fig4.do"
+
+. * --- Replicate Figure 4 (CSV-only)
+. 
+.         set more off
+
+. 
+. * --- Load data
+.         import delimited using "$DATA/casmez_replication.csv", clear
+(encoding automatically selected: ISO-8859-2)
+(7 vars, 14,784 obs)
+
+. 
+. * --- Ensure numeric (safe even if already numeric)
+.         cap destring year km casmez index_stateint segm3 codprov_istat codistat, replace force
+
+. 
+. * --- RD package
+.         cap which rdrobust
+
+.         if _rc ssc install rdrobust, replace
+
+. 
+. * --- Bandwidth = 47km (paper baseline)
+.         local bw = 47
+
+. 
+. * --- Top panel: pooled 1994–2018
+.         rdplot index_stateint km if inrange(year,1994,2018) & abs(km)<100, ///
+>                 c(0) p(1) h(`bw' `bw') kernel(tri) ///
+>                 graph_options(name(stateint9418, replace) nodraw) ///
+>                 title("1994–2018")
+Mass points detected in the running variable.
+
+RD Plot with evenly spaced mimicking variance number of bins using polynomial regression.
+
+         Cutoff c = 0 | Left of c  Right of c        Number of obs  =       4247
+----------------------+----------------------        Kernel         = Triangular
+        Number of obs |      2012        2235
+   Eff. Number of obs |      1333        1144
+  Order poly. fit (p) |         1           1
+     BW poly. fit (h) |    47.000      47.000
+ Number of bins scale |     1.000       1.000
+
+Outcome: index_stateint. Running variable: km.
+---------------------------------------------
+                      | Left of c  Right of c
+----------------------+----------------------
+        Bins selected |        66          61
+   Average bin length |     1.507       1.637
+    Median bin length |     1.507       1.637
+----------------------+----------------------
+    IMSE-optimal bins |         4           5
+  Mimicking Var. bins |        66          61
+----------------------+----------------------
+Rel. to IMSE-optimal: | 
+        Implied scale |    16.500      12.200
+    WIMSE var. weight |     0.000       0.001
+    WIMSE bias weight |     1.000       0.999
+---------------------------------------------
+
+
+. 
+. * --- Bottom panel: 2013 only
+.         rdplot index_stateint km if year==2013 & abs(km)<100, ///
+>                 c(0) p(1) h(`bw' `bw') kernel(tri) ///
+>                 graph_options(name(stateint2013, replace) nodraw) ///
+>                 title("2013")
+
+RD Plot with evenly spaced mimicking variance number of bins using spacings estimators.
+
+         Cutoff c = 0 | Left of c  Right of c        Number of obs  =        621
+----------------------+----------------------        Kernel         = Triangular
+        Number of obs |       288         333
+   Eff. Number of obs |       191         170
+  Order poly. fit (p) |         1           1
+     BW poly. fit (h) |    47.000      47.000
+ Number of bins scale |     1.000       1.000
+
+Outcome: index_stateint. Running variable: km.
+---------------------------------------------
+                      | Left of c  Right of c
+----------------------+----------------------
+        Bins selected |        17          16
+   Average bin length |     5.849       6.242
+    Median bin length |     5.849       6.242
+----------------------+----------------------
+    IMSE-optimal bins |        10           3
+  Mimicking Var. bins |        17          16
+----------------------+----------------------
+Rel. to IMSE-optimal: | 
+        Implied scale |     1.700       5.333
+    WIMSE var. weight |     0.169       0.007
+    WIMSE bias weight |     0.831       0.993
+---------------------------------------------
+
+
+. 
+. * --- Combine and export
+.         graph combine stateint9418 stateint2013, rows(2) graphregion(color(white))
+
+.         graph export "$FIG/Fig4_MWE.pdf", replace
+file /Users/mirellacharos/Documents/ECO726-casmez-replication/output/fig/Fig4_MWE.pdf saved as
+    PDF format
+
+. 
+end of do-file
+
+.         do "$DO/02_replication_table2.do"
+
+. * Table 2 - Baseline RD Estimates (CSV-only, bw=47)
+. * Replicator: Mirella Charros
+. 
+.         set more off
+
+. 
+. * --- Settings
+.         local bw = 47
+
+.         global covs_reg "i.segm3 i.codprov_istat"
+
+. 
+. * --- Load CSV
+.         import delimited using "$DATA/casmez_replication.csv", clear
+(encoding automatically selected: ISO-8859-2)
+(7 vars, 14,784 obs)
+
+.         cap destring year km casmez index_stateint segm3 codprov_istat codistat, replace force
+
+. 
+. * --- Drop any existing dummy vars
+.         cap drop seg_*
+
+.         cap drop prov_*
+
+.         cap drop yr_*
+
+. 
+. * --- Build dummy covariates for rdrobust (NO factor vars allowed)
+. 
+. 
+.         * Segment dummies: seg_1 seg_2 seg_3
+.         quietly tab segm3, gen(seg_)
+
+. 
+.         * Province dummies: prov_1 ... prov_K
+.         quietly tab codprov_istat, gen(prov_)
+
+. 
+.         * Base covariates list for rdrobust:
+.         global covs_rb ""
+
+. 
+.         cap confirm variable seg_2
+
+.         if !_rc global covs_rb "$covs_rb seg_2"
+
+.         cap confirm variable seg_3
+
+.         if !_rc global covs_rb "$covs_rb seg_3"
+
+. 
+.         * Add all prov_* except prov_1 (robustly)
+.         cap unab provlist : prov_*
+
+.         if !_rc {
+.                 local provlist "`provlist'"
+.                 cap confirm variable prov_1
+.                 if !_rc local provlist : list provlist - prov_1
+.                 global covs_rb "$covs_rb `provlist'"
+. }
+
+. 
+. 
+. * --- (2) 2013 only
+. 
+.         * Parametric (linear) RD
+.         qui reg index_stateint casmez c.km $covs_reg if year==2013 & abs(km)<`bw', robust
+
+.         local b2013p  : display %10.2f _b[casmez]
+
+.         local se2013p : display %10.2f _se[casmez]
+
+. 
+.         * Nonparametric RD (rdrobust)
+.         qui rdrobust index_stateint km if year==2013 & abs(km)<`bw', ///
+>                 c(0) p(1) h(`bw' `bw') kernel(tri) ///
+>                 covs($covs_rb)
+Multicollinearity issue detected in covs. Redundant covariates were removed.
+
+.         local b2013np  : display %10.2f e(tau_bc)
+
+.         local se2013np : display %10.2f e(se_tau_rb)
+
+. 
+.         * Summary stats
+.         qui sum index_stateint if year==2013 & abs(km)<`bw'
+
+.         local mean2013 : display %10.2f r(mean)
+
+.         local sd2013   : display %10.2f r(sd)
+
+.         local n2013    : display %10.0f r(N)
+
+. 
+. * --- (1) pooled 1994–2018
+. 
+.         * Parametric pooled RD (with year FE)
+.         qui reg index_stateint casmez c.km $covs_reg i.year ///
+>                 if inrange(year,1994,2018) & abs(km)<`bw', robust
+
+.         local bpoolp  : display %10.2f _b[casmez]
+
+.         local sepoolp : display %10.2f _se[casmez]
+
+. 
+.         * Year dummies for rdrobust (no i.year allowed)
+.         quietly tab year if inrange(year,1994,2018), gen(yr_)
+
+. 
+.         cap unab yrlist : yr_*
+
+.         if _rc local yrlist ""
+
+.         else {
+.                 cap confirm variable yr_1
+.                 if !_rc local yrlist : list yrlist - yr_1
+. }
+
+. 
+.         qui rdrobust index_stateint km if inrange(year,1994,2018) & abs(km)<`bw', ///
+>                 c(0) p(1) h(`bw' `bw') kernel(tri) ///
+>                 covs($covs_rb `yrlist')
+Multicollinearity issue detected in covs. Redundant covariates were removed.
+
+.         local bpoolnp  : display %10.2f e(tau_bc)
+
+.         local sepoolnp : display %10.2f e(se_tau_rb)
+
+. 
+.         * Summary stats pooled (within estimation window)
+.         qui sum index_stateint if inrange(year,1994,2018) & abs(km)<`bw'
+
+.         local meanpool : display %10.2f r(mean)
+
+.         local sdpool   : display %10.2f r(sd)
+
+.         local npool    : display %10.0f r(N)
+
+. 
+. 
+. * --- Export LaTeX table (texdoc)
+. 
+.         cap which texdoc
+
+.         if _rc ssc install texdoc, replace
+
+. 
+. texdoc init "$TAB/Tab2_replication.tex", replace force
+(texdoc output file is ./output/tab/Tab2_replication.tex)
+
+. 
+. tex \begin{tabular}{lcc}
+
+. tex \hline\hline
+
+. tex \textit{Outcome variable:} & \multicolumn{1}{c}{All elections 1994--2018} & \multicolumn{1}{c
+> }{2013 election} \\
+
+. tex \textit{Support for state intervention} & \multicolumn{1}{c}{(1)} & \multicolumn{1}{c}{(2)} \
+> \
+
+. tex \hline\hline
+
+. tex \\
+
+. tex \multicolumn{3}{l}{\textit{Panel (a): Parametric (linear) estimates}} \\
+
+. tex RD estimate & `bpoolp' & `b2013p' \\
+
+. tex            & (`sepoolp') & (`se2013p') \\
+
+. tex \\
+
+. tex \multicolumn{3}{l}{\textit{Panel (b): Non-parametric estimates}} \\
+
+. tex RD estimate & `bpoolnp' & `b2013np' \\
+
+. tex            & (`sepoolnp') & (`se2013np') \\
+
+. tex \hline
+
+. tex Bandwidth (km) & `bw' & `bw' \\
+
+. tex Observations   & `npool' & `n2013' \\
+
+. tex Mean           & `meanpool' & `mean2013' \\
+
+. tex Standard deviation & `sdpool' & `sd2013' \\
+
+. tex \hline\hline
+
+. tex \end{tabular}
+
+. 
+. texdoc close
+(texdoc output written to ./output/tab/Tab2_replication.tex)
+
+. 
+. di as txt "Saved: $TAB/Tab2_replication.tex"
+Saved: ./output/tab/Tab2_replication.tex
+
+. 
+end of do-file
+
+. 
+. 
+. * --- Run extension 
+.         do "$DO/03_extension.do"
+
+. * Extension on Heterogeneity for 2013 only 
+. * Replicator: Mirella Charros 
+. 
+. 
+.         set more off 
+
+.         
+. * --- parameters 
+.         local bw 47
+
+.         global covs "i.codprov_istat"
+
+. 
+. * --- Import csv
+.         import delimited using "$DATA/casmez_replication.csv", clear
+(encoding automatically selected: ISO-8859-2)
+(7 vars, 14,784 obs)
+
+.         cap destring year km casmez index_stateint segm3 codprov_istat codistat, replace force
+
+. 
+. * --- 2013 election - heterogeneity
+.         est clear
+
+. foreach s in 1 2 3 {
+  2.     qui reg index_stateint casmez c.km $covs ///
+>         if year==2013 & segm3==`s' & abs(km)<`bw', robust
+  3.     est sto segm3_`s'
+  4. }
+
+. 
+.         esttab segm3_1 segm3_2 segm3_3, ///
+>     keep(casmez) se b(%9.2f) se(%9.2f) ///
+>     title("Heterogeneity by Municipality Type (2013)") ///
+>     mtitles("segm3=1" "segm3=2" "segm3=3")
+
+Heterogeneity by Municipality Type (2013)
+------------------------------------------------------------
+                      (1)             (2)             (3)   
+                  segm3=1         segm3=2         segm3=3   
+------------------------------------------------------------
+casmez               6.73***         1.82            4.03** 
+                   (1.78)          (3.24)          (1.25)   
+------------------------------------------------------------
+N                     151              63             147   
+------------------------------------------------------------
+Standard errors in parentheses
+* p<0.05, ** p<0.01, *** p<0.001
+
+. 
+. * --- Export table to LaTex
+. 
+.         esttab segm3_1 segm3_2 segm3_3 ///
+>                 using "$OUT/tab/Tab_extension_segm3.tex", ///
+>                 replace ///
+>                 keep(casmez) ///
+>                 se ///
+>                 b(%9.2f) se(%9.2f) ///
+>                 star(* 0.10 ** 0.05 *** 0.01) ///
+>                 mtitles("segm3 = 1" "segm3 = 2" "segm3 = 3") ///
+>                 title("Heterogeneity by Municipality Type (2013)") ///
+>                 label
+(output written to ./output/tab/Tab_extension_segm3.tex)
+
+. 
+.         di as txt "Saved: $TAB/Tab_extension_segm3.tex"
+Saved: ./output/tab/Tab_extension_segm3.tex
+
+. 
+end of do-file
+
+. 
+.         log close
+      name:  <unnamed>
+       log:  /Users/mirellacharos/Documents/ECO726-casmez-replication/output/log/master.log
+  log type:  text
+ closed on:  16 Dec 2025, 22:05:18
+---------------------------------------------------------------------------------------------------
